@@ -25,8 +25,13 @@
 #include "common/hash-str.h"
 #include "common/hashmap.h"
 #include "common/util.h"
+#include "common/fs.h"
+#include "common/archive.h"
+#include "common/ptr.h"
 
 #include "audio/audiostream.h"
+#include "video/bink_decoder.h"
+#include "video/bink2_decoder.h"
 #include "image/bmp.h"
 
 #include "engines/nancy/movieplayer.h"
@@ -65,6 +70,8 @@ NancyConsole::NancyConsole() : GUI::Debugger() {
 	registerCmd("show_image", WRAP_METHOD(NancyConsole, Cmd_showImage));
 	registerCmd("export_image", WRAP_METHOD(NancyConsole, Cmd_exportImage));
 	registerCmd("play_video", WRAP_METHOD(NancyConsole, Cmd_playVideo));
+	registerCmd("test_movies", WRAP_METHOD(NancyConsole, Cmd_testMovies));
+	registerCmd("test_sounds", WRAP_METHOD(NancyConsole, Cmd_testSounds));
 	registerCmd("play_sound", WRAP_METHOD(NancyConsole, Cmd_playSound));
 	registerCmd("load_scene", WRAP_METHOD(NancyConsole, Cmd_loadScene));
 	registerCmd("scene_id", WRAP_METHOD(NancyConsole, Cmd_sceneID));
@@ -395,6 +402,121 @@ bool NancyConsole::Cmd_exportImage(int argc, const char **argv) {
 	return true;
 }
 
+bool NancyConsole::Cmd_testMovies(int argc, const char **argv) {
+	if (argc < 2 || argc > 3) {
+		debugPrintf("Decodes every frame of the Bink movies matching a pattern, and reports the ones that fail.\n");
+		debugPrintf("Usage: %s <pattern> [max frames per movie]\n", argv[0]);
+		return true;
+	}
+
+	const int maxFrames = argc == 3 ? atoi(argv[2]) : 0;
+	Common::ArchiveMemberList members;
+	SearchMan.listMatchingMembers(members, Common::Path(argv[1], Common::Path::kNativeSeparator));
+
+	uint numTested = 0, numFailed = 0;
+	for (const Common::ArchiveMemberPtr &member : members) {
+		const Common::String name = member->getFileName();
+		if (!name.hasSuffixIgnoreCase(".bik") && !name.hasSuffixIgnoreCase(".bk2")) {
+			continue;
+		}
+
+		Common::SeekableReadStream *stream = member->createReadStream();
+		if (!stream) {
+			debugPrintf("FAIL %s: cannot open\n", name.c_str());
+			++numFailed;
+			continue;
+		}
+
+		Common::ScopedPtr<Video::VideoDecoder> decoder;
+		if (Video::Bink2Decoder::isBink2(*stream)) {
+			decoder.reset(new Video::Bink2Decoder(g_nancy->getGameType() == kGameTypeNancy29));
+		} else {
+			decoder.reset(new Video::BinkDecoder());
+		}
+
+		stream->seek(0);
+		++numTested;
+		if (!decoder->loadStream(stream)) {
+			debugPrintf("FAIL %s: cannot load\n", name.c_str());
+			++numFailed;
+			continue;
+		}
+
+		decoder->setOutputPixelFormat(g_nancy->_graphics->getInputPixelFormat());
+		const int frameCount = decoder->getFrameCount();
+		int decoded = 0, nulls = 0;
+		while (!decoder->endOfVideo() && (maxFrames <= 0 || decoded < maxFrames)) {
+			if (!decoder->decodeNextFrame()) {
+				++nulls;
+			}
+
+			++decoded;
+			if (decoded > frameCount + 10) {
+				break;
+			}
+		}
+
+		const bool failed = nulls || (maxFrames <= 0 && decoded != frameCount);
+		if (failed) {
+			++numFailed;
+		}
+
+		debugPrintf("%s %s: %dx%d, %d/%d frames, %d null\n", failed ? "FAIL" : "ok", name.c_str(),
+			decoder->getWidth(), decoder->getHeight(), decoded, frameCount, nulls);
+	}
+
+	debugPrintf("Tested %u movies, %u failed\n", numTested, numFailed);
+	return true;
+}
+
+bool NancyConsole::Cmd_testSounds(int argc, const char **argv) {
+	if (argc != 2) {
+		debugPrintf("Decodes all of every .his sound matching a pattern, and reports the ones that fail.\n");
+		debugPrintf("Usage: %s <pattern>\n", argv[0]);
+		return true;
+	}
+
+	Common::ArchiveMemberList members;
+	SearchMan.listMatchingMembers(members, Common::Path(argv[1], Common::Path::kNativeSeparator));
+
+	uint numTested = 0, numFailed = 0;
+	int16 buffer[4096];
+	for (const Common::ArchiveMemberPtr &member : members) {
+		const Common::String name = member->getFileName();
+		if (!name.hasSuffixIgnoreCase(".his")) {
+			continue;
+		}
+
+		++numTested;
+		Common::SeekableReadStream *file = member->createReadStream();
+		Audio::SeekableAudioStream *stream = file ? SoundManager::makeHISStream(file, DisposeAfterUse::YES) : nullptr;
+		if (!stream) {
+			debugPrintf("FAIL %s: cannot open\n", name.c_str());
+			++numFailed;
+			continue;
+		}
+
+		uint64 samples = 0;
+		int read;
+		while ((read = stream->readBuffer(buffer, ARRAYSIZE(buffer))) > 0) {
+			samples += read;
+		}
+
+		const uint64 expected = (uint64)stream->getLength().convertToFramerate(stream->getRate()).totalNumberOfFrames() * (stream->isStereo() ? 2 : 1);
+		const bool failed = read < 0 || samples == 0 || (expected && (samples + 4096 < expected || samples > expected + 4096));
+		if (failed) {
+			++numFailed;
+		}
+
+		debugPrintf("%s %s: %d Hz, %s, %llu samples, %llu expected\n", failed ? "FAIL" : "ok", name.c_str(), stream->getRate(),
+			stream->isStereo() ? "stereo" : "mono", (unsigned long long)samples, (unsigned long long)expected);
+		delete stream;
+	}
+
+	debugPrintf("Tested %u sounds, %u failed\n", numTested, numFailed);
+	return true;
+}
+
 bool NancyConsole::Cmd_playVideo(int argc, const char **argv) {
 	if (g_nancy->getGameType() == kGameTypeVampire) {
 		if (argc != 3) {
@@ -720,7 +842,7 @@ void NancyConsole::recursePrintDependencies(const Action::DependencyRecord &reco
 bool NancyConsole::Cmd_lua(int argc, const char **argv) {
 	if (argc < 3) {
 		debugPrintf("Runs Lua code in the state of a stream of the scene scripts, in Nancy19 and later.\n");
-		debugPrintf("Usage: %s <stream> <code...>\n", argv[0]);
+		debugPrintf("Usage: %s <stream> <code...>, or %s <stream> @<file>\n", argv[0], argv[0]);
 		debugPrintf("The main scene is the stream %s. What the code returns is printed.\n", State::SceneStreamManager::getMainStreamName());
 		return true;
 	}
@@ -744,9 +866,22 @@ bool NancyConsole::Cmd_lua(int argc, const char **argv) {
 	}
 
 	Common::String code;
-	for (int i = 2; i < argc; ++i) {
-		code += (i > 2 ? " " : "");
-		code += argv[i];
+	if (argc == 3 && argv[2][0] == '@') {
+		// @file runs the code in a file
+		Common::FSNode node(Common::Path(argv[2] + 1, Common::Path::kNativeSeparator));
+		Common::SeekableReadStream *file = node.createReadStream();
+		if (!file) {
+			debugPrintf("Could not open %s\n", argv[2] + 1);
+			return true;
+		}
+
+		code = file->readString(0, file->size());
+		delete file;
+	} else {
+		for (int i = 2; i < argc; ++i) {
+			code += (i > 2 ? " " : "");
+			code += argv[i];
+		}
 	}
 
 	lua_State *L = context->getLua();

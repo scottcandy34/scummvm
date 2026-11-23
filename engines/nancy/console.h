@@ -62,6 +62,8 @@ private:
 	bool Cmd_listManagers(int argc, const char **argv);
 	bool Cmd_cheatMode(int argc, const char **argv);
 	bool Cmd_lua(int argc, const char **argv);
+	bool Cmd_testMovies(int argc, const char **argv);
+	bool Cmd_testSounds(int argc, const char **argv);
 #endif
 	bool Cmd_actionRecordExport(int argc, const char **argv);
 	bool Cmd_scanForActionRecordType(int argc, const char **argv);
