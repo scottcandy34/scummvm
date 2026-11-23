@@ -467,10 +467,13 @@ bool HotspotRecord::getField(const Common::String &key) {
 		pushColor(L, _refColor);
 	} else if (key == "source") {
 		pushRect(L, _source);
-	} else if (key == "tooltip") {
-		lua_pushstring(L, _tooltip.c_str());
-	} else if (key == "tooltipManager") {
-		lua_pushstring(L, _tooltipManager.c_str());
+	} else if (key == "tooltip" || key == "tooltipManager") {
+		const Common::String &tooltip = (key == "tooltip" ? _tooltip : _tooltipManager);
+		if (tooltip.empty()) {
+			lua_pushnil(L);
+		} else {
+			lua_pushstring(L, tooltip.c_str());
+		}
 	} else if (key == "tileSize") {
 		pushPoint(L, Common::Point32((int32)_tileSize[0], (int32)_tileSize[1]));
 	} else if (key == "cursorTile") {
@@ -534,7 +537,8 @@ bool HotspotRecord::setField(const Common::String &key) {
 			sendTooltip(false);
 		}
 
-		(key == "tooltip" ? _tooltip : _tooltipManager) = luaL_checkstring(L, 3);
+		// UI_Inventory clears an item's tooltip by setting it to nil
+		(key == "tooltip" ? _tooltip : _tooltipManager) = lua_isnil(L, 3) ? "" : luaL_checkstring(L, 3);
 		if (_isMouseOver) {
 			sendTooltip(true);
 		}
