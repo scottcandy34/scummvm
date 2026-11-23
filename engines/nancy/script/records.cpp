@@ -2779,11 +2779,9 @@ bool SoundRecord::getField(const Common::String &key) {
 	} else if (key == "PlayInstance") {
 		lua_pushcfunction(L, soundPlayInstance);
 	} else if (key == "group") {
-		if (_group.empty()) {
-			lua_pushnil(L);
-		} else {
-			lua_pushstring(L, _group.c_str());
-		}
+		// An unset group reads as an empty string: the puzzle views pick
+		// PlayInstance or Restart with "sound.group ~= ''"
+		lua_pushstring(L, _group.c_str());
 	} else if (key == "volumeVariance") {
 		lua_pushnumber(L, _volumeVariance);
 	} else if (key == "pitch") {
