@@ -855,7 +855,28 @@ bool WidgetRecord::getField(const Common::String &key) {
 bool WidgetRecord::setField(const Common::String &key) {
 	lua_State *L = getLua();
 
-	if (key == "baseColor") {
+	// Nancy30's SymbolsView hands a button its selected overlay after making it
+	Record **record = nullptr;
+	if (key == "baseOvl") {
+		record = &_baseOverlay;
+	} else if (key == "upOvl") {
+		record = &_upOverlay;
+	} else if (key == "downOvl") {
+		record = &_downOverlay;
+	} else if (key == "overOvl") {
+		record = &_overOverlay;
+	} else if (key == "selectedOvl") {
+		record = &_selectedOverlay;
+	}
+
+	if (record) {
+		*record = lua_isnil(L, 3) ? nullptr : checkRecord(L, 3);
+		if (*record) {
+			(*record)->setParentNode(getNode());
+		}
+
+		_wasEnabled = !isNodeEnabled();
+	} else if (key == "baseColor") {
 		_baseColor = checkColor(L, 3);
 		_wasEnabled = !isNodeEnabled();
 	} else if (key == "disabledColor") {
