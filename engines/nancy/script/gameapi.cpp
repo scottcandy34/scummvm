@@ -755,7 +755,9 @@ enum SavedValueTag {
 	kSavedNumber	= 3,
 	kSavedString	= 4,
 	kSavedTable		= 5,
-	kSavedRect		= 6
+	kSavedRect		= 6,
+	kSavedMatrix	= 7,
+	kSavedColor		= 8
 };
 
 static void writeSavedUint32(Common::Array<byte> &out, uint32 value) {
@@ -843,6 +845,32 @@ static bool writeSavedValue(lua_State *L, int index, Common::Array<byte> &out, i
 			return true;
 		}
 
+		// Nancy30's OvlRecorder_SC keeps how the overlays of a solved puzzle
+		// were drawn, so that the scene after it can show them again: their
+		// transforms and colors along with their rects
+		const ScriptMatrix *matrix = testMatrix(L, index);
+		if (matrix) {
+			out.push_back(kSavedMatrix);
+			for (int i = 0; i < 4; ++i) {
+				for (int j = 0; j < 4; ++j) {
+					writeSavedNumber(out, matrix->m[i][j]);
+				}
+			}
+
+			out.push_back(matrix->isSRT ? 1 : 0);
+			writeSavedNumber(out, matrix->scaleX);
+			writeSavedNumber(out, matrix->scaleY);
+			writeSavedNumber(out, matrix->rotation);
+			return true;
+		}
+
+		const uint32 *color = testColor(L, index);
+		if (color) {
+			out.push_back(kSavedColor);
+			writeSavedUint32(out, *color);
+			return true;
+		}
+
 		// Of the other objects only rects can be kept, e.g. the parts of the
 		// screen Nancy23's photo manager gets handed
 		const ScriptRect *rect = testRect(L, index);
@@ -869,6 +897,20 @@ static uint32 readSavedUint32(const Common::Array<byte> &in, uint &pos) {
 	}
 
 	return value;
+}
+
+// A number packed without its tag
+static double readSavedNumber(const Common::Array<byte> &in, uint &pos) {
+	if (pos < in.size()) {
+		++pos;
+	}
+
+	uint64 bits = readSavedUint32(in, pos);
+	bits |= (uint64)readSavedUint32(in, pos) << 32;
+
+	double number;
+	memcpy(&number, &bits, sizeof(number));
+	return number;
 }
 
 // Pushes the value packed at a position
@@ -923,6 +965,24 @@ static void readSavedValue(lua_State *L, const Common::Array<byte> &in, uint &po
 		pushRect(L, rect);
 		break;
 	}
+	case kSavedMatrix: {
+		ScriptMatrix matrix;
+		for (int i = 0; i < 4; ++i) {
+			for (int j = 0; j < 4; ++j) {
+				matrix.m[i][j] = readSavedNumber(in, pos);
+			}
+		}
+
+		matrix.isSRT = pos < in.size() && in[pos++] != 0;
+		matrix.scaleX = readSavedNumber(in, pos);
+		matrix.scaleY = readSavedNumber(in, pos);
+		matrix.rotation = readSavedNumber(in, pos);
+		pushMatrix(L, matrix);
+		break;
+	}
+	case kSavedColor:
+		pushColor(L, readSavedUint32(in, pos));
+		break;
 	default:
 		lua_pushnil(L);
 		break;
@@ -937,7 +997,7 @@ static int saveData(lua_State *L) {
 
 	Common::Array<byte> packed;
 	if (!writeSavedValue(L, 3, packed, 0)) {
-		return luaL_error(L, "Save:Data can only save tables, numbers, booleans, strings and nils");
+		return luaL_error(L, "Save:Data can only save tables, numbers, booleans, strings, rects, matrices, colors and nils");
 	}
 
 	ScriptSavedData *saved = (ScriptSavedData *)NancySceneState.getPuzzleData(ScriptSavedData::getTag());
@@ -1027,7 +1087,7 @@ static int saveAttic(lua_State *L) {
 
 	Common::Array<byte> packed;
 	if (!writeSavedValue(L, 3, packed, 0)) {
-		return luaL_error(L, "Save:Attic can only save tables, numbers, booleans, strings and nils");
+		return luaL_error(L, "Save:Attic can only save tables, numbers, booleans, strings, rects, matrices, colors and nils");
 	}
 
 	loadAtticFile();
