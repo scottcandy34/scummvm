@@ -19,6 +19,8 @@
  *
  */
 
+#include "engines/nancy/state/scene.h"
+
 #include "engines/nancy/script/graphnode.h"
 #include "engines/nancy/script/luabind.h"
 #include "engines/nancy/script/record.h"
@@ -28,6 +30,11 @@ namespace Nancy {
 namespace Script {
 
 static const char *const kGraphNodeType = "ND.GraphNode";
+
+GraphNode::GraphNode(SceneContext &context, Record *owner) :
+		_context(context),
+		_owner(owner),
+		_creationOrder(owner ? owner->getCreationOrder() : NancySceneState.getStreams().takeRecordOrder()) {}
 
 double GraphNode::getZ() const {
 	return _parent ? _z + _parent->getZ() : _z;

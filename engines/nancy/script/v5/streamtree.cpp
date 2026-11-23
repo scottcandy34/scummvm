@@ -77,17 +77,28 @@ void SceneContext::onBandChanged() {
 namespace {
 
 // The z values from the topmost node down to a record, which order the records
-// the way the tree does
+// the way the tree does. On each level, what has the same z is drawn in the
+// order it was made, so a record made after a Transformer is drawn over the
+// records under it.
+struct DrawLevel {
+	double z;
+	uint32 order;
+};
+
 struct DrawKey {
 	Record *record;
 	uint index;		// of creation, for records with the same place
-	Common::Array<double> path;
+	Common::Array<DrawLevel> path;
 };
 
 bool isDrawnBefore(const DrawKey &a, const DrawKey &b) {
 	for (uint i = 0; i < a.path.size() && i < b.path.size(); ++i) {
-		if (a.path[i] != b.path[i]) {
-			return a.path[i] < b.path[i];
+		if (a.path[i].z != b.path[i].z) {
+			return a.path[i].z < b.path[i].z;
+		}
+
+		if (a.path[i].order != b.path[i].order) {
+			return a.path[i].order < b.path[i].order;
 		}
 	}
 
@@ -108,9 +119,9 @@ void SceneContext::updateDrawRanks() {
 		DrawKey &key = keys[i];
 		key.record = _records[i];
 		key.index = i;
-		key.path.push_back(_records[i]->getLocalZ());
+		key.path.push_back({_records[i]->getLocalZ(), _records[i]->getCreationOrder()});
 		for (const GraphNode *node = _records[i]->getParentNode(); node; node = node->getParent()) {
-			key.path.insert_at(0, node->getLocalZ());
+			key.path.insert_at(0, {node->getLocalZ(), node->getCreationOrder()});
 		}
 	}
 

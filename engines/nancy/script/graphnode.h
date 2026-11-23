@@ -41,10 +41,13 @@ class SceneContext;
 class GraphNode {
 public:
 	// A Transformer record is the owner of its node
-	GraphNode(SceneContext &context, Record *owner = nullptr) : _context(context), _owner(owner) {}
+	GraphNode(SceneContext &context, Record *owner = nullptr);
 
 	SceneContext &getContext() const { return _context; }
 	Record *getOwner() const { return _owner; }
+
+	// The place of the node among the records made, which is its owner's
+	uint32 getCreationOrder() const { return _creationOrder; }
 
 	// Including those of the nodes above
 	double getZ() const;
@@ -80,6 +83,7 @@ public:
 private:
 	SceneContext &_context;
 	Record *_owner;
+	uint32 _creationOrder;
 	double _z = 0.0;
 	ScriptMatrix _transform;
 	GraphNode *_parent = nullptr;
