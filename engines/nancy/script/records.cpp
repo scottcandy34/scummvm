@@ -1886,6 +1886,25 @@ static int overlayDefaultRects(lua_State *L) {
 	return 0;
 }
 
+// ar:Draw(table), Nancy30: the same as Draw:OVL with the overlay itself as
+// table.ar. The table may be left out, and then the overlay is drawn as it is.
+static int overlayDraw(lua_State *L) {
+	OverlayRecord *record = dynamic_cast<OverlayRecord *>(checkRecord(L, 1));
+	if (!record) {
+		return luaL_typerror(L, 1, "ND.Overlay");
+	}
+
+	if (lua_isnoneornil(L, 2)) {
+		lua_settop(L, 1);
+		lua_newtable(L);
+	} else {
+		luaL_checktype(L, 2, LUA_TTABLE);
+	}
+
+	record->drawCopy(2);
+	return 0;
+}
+
 #ifdef ENABLE_NANCY_V5
 // Returns the index of the copy, counting from 0
 int OverlayRecord::addCopy() {
@@ -2062,6 +2081,8 @@ bool OverlayRecord::getField(const Common::String &key) {
 		lua_pushstring(L, _treeName.c_str());
 	} else if (key == "DefaultRects") {
 		lua_pushcfunction(L, overlayDefaultRects);
+	} else if (key == "Draw" && g_nancy->getGameType() >= kGameTypeNancy30) {
+		lua_pushcfunction(L, overlayDraw);
 #ifdef ENABLE_NANCY_V5
 	} else if (key == "Copy") {
 		lua_pushcfunction(L, overlayCopy);
