@@ -39,7 +39,9 @@ static const DebugChannelDef debugFlagList[] = {
 	{ Nancy::kDebugActionRecord, "ActionRecord", "Action Record debug" },
 	{ Nancy::kDebugScene, "Scene", "Scene debug" },
 	{ Nancy::kDebugSound, "Sound", "Sound debug" },
+	{ Nancy::kDebugVideo, "Video", "Video debug" },
 	{ Nancy::kDebugHypertext, "Hypertext", "Hypertext rendering debug" },
+	{ Nancy::kDebugScript, "Script", "Lua script API debug: missing functions and globals" },
 	DEBUG_CHANNEL_END
 };
 

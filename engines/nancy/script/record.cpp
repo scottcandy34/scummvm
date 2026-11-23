@@ -484,7 +484,7 @@ int Record::getScriptField() {
 	}
 
 	// The functions every record has
-	indexFunctions(L);
+	pushTypeFunction(L);
 	if (!lua_isnil(L, -1)) {
 		return 1;
 	}
@@ -496,6 +496,12 @@ int Record::getScriptField() {
 	}
 
 	pushStoredValue(key.c_str());
+	if (lua_isnil(L, -1)) {
+		const int top = lua_gettop(L);
+		reportMissingField(L);
+		lua_settop(L, top);
+	}
+
 	return 1;
 }
 

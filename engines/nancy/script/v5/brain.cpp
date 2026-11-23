@@ -404,7 +404,7 @@ static int brainIndex(lua_State *L) {
 		return 1;
 	}
 
-	indexFunctions(L);
+	pushTypeFunction(L);
 	if (lua_isnil(L, -1)) {
 		return luaL_error(L, "There is no logic for %s", name);
 	}

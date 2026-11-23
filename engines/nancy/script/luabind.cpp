@@ -21,6 +21,11 @@
 
 #include "common/array.h"
 
+#include "common/debug.h"
+#include "common/hashmap.h"
+#include "common/hash-str.h"
+
+#include "engines/nancy/detection.h"
 #include "engines/nancy/script/luabind.h"
 
 namespace Nancy {
@@ -69,7 +74,7 @@ void *checkUserData(lua_State *L, int index, const char *typeName) {
 	return luaL_checkudata(L, index, typeName);
 }
 
-int indexFunctions(lua_State *L) {
+int pushTypeFunction(lua_State *L) {
 	if (!lua_getmetatable(L, 1)) {
 		lua_pushnil(L);
 		return 1;
@@ -77,6 +82,43 @@ int indexFunctions(lua_State *L) {
 
 	lua_pushvalue(L, 2);
 	lua_rawget(L, -2);
+	lua_remove(L, -2);
+	return 1;
+}
+
+void reportMissingField(lua_State *L) {
+	if (lua_type(L, 2) != LUA_TSTRING || !debugChannelSet(1, kDebugScript)) {
+		return;
+	}
+
+	const char *typeName = "?";
+	if (lua_getmetatable(L, 1)) {
+		lua_getfield(L, -1, "__metatable");
+		if (lua_isstring(L, -1)) {
+			typeName = lua_tostring(L, -1);
+		}
+	}
+
+	// Reported once per type and name
+	static Common::HashMap<Common::String, bool> reported;
+	const Common::String key = Common::String::format("%s.%s", typeName, lua_tostring(L, 2));
+	if (!reported.contains(key)) {
+		reported.setVal(key, true);
+		luaL_where(L, 1);
+		debugC(1, kDebugScript, "%sno '%s' in engine type %s", lua_tostring(L, -1), lua_tostring(L, 2), typeName);
+		lua_pop(L, 1);
+	}
+
+}
+
+int indexFunctions(lua_State *L) {
+	pushTypeFunction(L);
+	if (lua_isnil(L, -1)) {
+		const int top = lua_gettop(L);
+		reportMissingField(L);
+		lua_settop(L, top);
+	}
+
 	return 1;
 }
 

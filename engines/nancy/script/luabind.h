@@ -59,6 +59,13 @@ void *checkUserData(lua_State *L, int index, const char *typeName);
 // the type that is named by the key at index 2, or nil
 int indexFunctions(lua_State *L);
 
+// The same, for an __index function that looks further when this gives nil
+int pushTypeFunction(lua_State *L);
+
+// With the Script debug channel on, reports once that the scripts looked for
+// the name at index 2 in the object at index 1 and found nothing. Pushes nothing.
+void reportMissingField(lua_State *L);
+
 // Pushes a field of the table at an index. A missing field pushes nothing and
 // returns false.
 bool pushField(lua_State *L, int tableIndex, const char *name);

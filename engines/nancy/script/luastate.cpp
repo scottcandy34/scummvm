@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/debug.h"
 #include "common/array.h"
 #include "common/random.h"
 #include "common/stream.h"
@@ -343,6 +344,27 @@ int LuaState::callWrappedCoroutine(lua_State *L) {
 	return lua_gettop(L) - 1;
 }
 
+// With the Script debug channel on, reading a global that nothing has set is
+// reported once per name, to find the parts of the API that are missing
+static int reportMissingGlobal(lua_State *L) {
+	if (lua_type(L, 2) == LUA_TSTRING) {
+		lua_pushvalue(L, 2);
+		lua_rawget(L, lua_upvalueindex(1));
+		if (lua_isnil(L, -1)) {
+			lua_pushvalue(L, 2);
+			lua_pushboolean(L, 1);
+			lua_rawset(L, lua_upvalueindex(1));
+			luaL_where(L, 1);
+			debugC(1, kDebugScript, "%sglobal '%s' is not set", lua_tostring(L, -1), lua_tostring(L, 2));
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+	}
+
+	lua_pushnil(L);
+	return 1;
+}
+
 LuaState::LuaState(SceneContext *context) {
 	_state = luaL_newstate();
 	if (!_state) {
@@ -428,6 +450,16 @@ LuaState::LuaState(SceneContext *context) {
 	lua_rawset(_state, LUA_REGISTRYINDEX);
 
 	registerAPI(_state);
+
+	if (debugChannelSet(1, kDebugScript)) {
+		lua_pushvalue(_state, LUA_GLOBALSINDEX);
+		lua_newtable(_state);
+		lua_newtable(_state);
+		lua_pushcclosure(_state, reportMissingGlobal, 1);
+		lua_setfield(_state, -2, "__index");
+		lua_setmetatable(_state, -2);
+		lua_pop(_state, 1);
+	}
 }
 
 LuaState::~LuaState() {

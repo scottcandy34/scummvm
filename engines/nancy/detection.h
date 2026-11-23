@@ -120,6 +120,7 @@ enum NancyDebugChannels {
 	kDebugSound,
 	kDebugVideo,
 	kDebugHypertext,
+	kDebugScript,
 };
 
 // Settings found in the original engine

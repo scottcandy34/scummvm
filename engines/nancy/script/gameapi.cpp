@@ -2809,7 +2809,7 @@ static int autotextRemoveCC(lua_State *L) {
 
 // Autotext.<key> is the text of that key, or nil when there is none
 static int autotextIndex(lua_State *L) {
-	indexFunctions(L);
+	pushTypeFunction(L);
 	if (!lua_isnil(L, -1) || lua_type(L, 2) != LUA_TSTRING) {
 		return 1;
 	}

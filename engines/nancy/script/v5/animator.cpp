@@ -637,7 +637,7 @@ static bool findTrackKind(const char *name, AnimatorTrack::Kind &kind) {
 static int stageIndex(lua_State *L) {
 	AnimatorTrack::Kind kind;
 	if (lua_type(L, 2) != LUA_TSTRING || !findTrackKind(lua_tostring(L, 2), kind)) {
-		indexFunctions(L);
+		pushTypeFunction(L);
 		if (lua_isnil(L, -1) && g_nancy->getGameType() >= kGameTypeNancy30) {
 			lua_pop(L, 1);
 			checkStage(L).pushFields(L);
