@@ -1054,15 +1054,18 @@ static bool isAchievementKnown(const Common::String &id) {
 	return false;
 }
 
-// Achievements:InitIDs({ id, ... }) gives the achievements there are, once
+// Achievements:InitIDs({ id, ... }) gives the achievements there are. Nancy30
+// runs it from the RunOnce of a manager stream, which starts again when a saved
+// game is loaded, so a second call replaces the list instead of failing.
 static int achievementsInitIDs(lua_State *L) {
 	luaL_checktype(L, 2, LUA_TTABLE);
 	ScriptGameState &state = getGameState();
-	if (state.hasAchievementIds) {
+	if (state.hasAchievementIds && g_nancy->getGameType() < kGameTypeNancy30) {
 		return luaL_error(L, "Achievements are already loaded");
 	}
 
 	state.hasAchievementIds = true;
+	state.achievementIds.clear();
 	const int numIds = (int)lua_objlen(L, 2);
 	for (int i = 1; i <= numIds; ++i) {
 		lua_rawgeti(L, 2, i);
@@ -1108,7 +1111,7 @@ static int achievementsClearAll(lua_State *L) {
 
 static int achievementsIndex(lua_State *L) {
 	const Common::String key = luaL_checkstring(L, 2);
-	indexFunctions(L);
+	pushTypeFunction(L);
 	if (!lua_isnil(L, -1)) {
 		return 1;
 	}
