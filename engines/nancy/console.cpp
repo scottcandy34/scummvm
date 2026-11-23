@@ -46,6 +46,9 @@
 #ifdef ENABLE_NANCY_V4
 #include "engines/nancy/script/record.h"
 #include "engines/nancy/script/scenecontext.h"
+
+#include "common/lua/lua.h"
+#include "common/lua/lauxlib.h"
 #endif
 
 namespace Nancy {
@@ -71,6 +74,7 @@ NancyConsole::NancyConsole() : GUI::Debugger() {
 	registerCmd("script_export", WRAP_METHOD(NancyConsole, Cmd_scriptExport));
 	registerCmd("list_managers", WRAP_METHOD(NancyConsole, Cmd_listManagers));
 	registerCmd("cheat_mode", WRAP_METHOD(NancyConsole, Cmd_cheatMode));
+	registerCmd("lua", WRAP_METHOD(NancyConsole, Cmd_lua));
 #endif
 	registerCmd("actionrecord_export", WRAP_METHOD(NancyConsole, Cmd_actionRecordExport));
 	registerCmd("scan_ar_type", WRAP_METHOD(NancyConsole, Cmd_scanForActionRecordType));
@@ -713,6 +717,63 @@ void NancyConsole::recursePrintDependencies(const Action::DependencyRecord &reco
 #ifdef ENABLE_NANCY_V4
 // The records of the scripted scenes: those of every stream, or with the fields
 // the scripts gave them, those of one stream or one record of it
+bool NancyConsole::Cmd_lua(int argc, const char **argv) {
+	if (argc < 3) {
+		debugPrintf("Runs Lua code in the state of a stream of the scene scripts, in Nancy19 and later.\n");
+		debugPrintf("Usage: %s <stream> <code...>\n", argv[0]);
+		debugPrintf("The main scene is the stream %s. What the code returns is printed.\n", State::SceneStreamManager::getMainStreamName());
+		return true;
+	}
+
+	if (g_nancy->getGameType() < kGameTypeNancy19 || g_nancy->getState() != NancyState::kScene) {
+		debugPrintf("Only available in the scene state of Nancy19 and later\n");
+		return true;
+	}
+
+	Script::SceneContext *context = nullptr;
+	if (Common::String(argv[1]).equalsIgnoreCase(State::SceneStreamManager::getMainStreamName())) {
+		context = NancySceneState.getScriptScene();
+	} else {
+		State::SceneStream *stream = NancySceneState.getStreams().find(argv[1]);
+		context = stream ? stream->getScriptScene() : nullptr;
+	}
+
+	if (!context) {
+		debugPrintf("No running stream %s\n", argv[1]);
+		return true;
+	}
+
+	Common::String code;
+	for (int i = 2; i < argc; ++i) {
+		code += (i > 2 ? " " : "");
+		code += argv[i];
+	}
+
+	lua_State *L = context->getLua();
+	const int top = lua_gettop(L);
+
+	// An expression is printed, anything else is run as it is
+	if (luaL_loadbuffer(L, ("return " + code).c_str(), code.size() + 7, "=console") != 0) {
+		lua_pop(L, 1);
+		if (luaL_loadbuffer(L, code.c_str(), code.size(), "=console") != 0) {
+			debugPrintf("%s\n", lua_tostring(L, -1));
+			lua_settop(L, top);
+			return true;
+		}
+	}
+
+	if (lua_pcall(L, 0, LUA_MULTRET, 0) != 0) {
+		debugPrintf("%s\n", lua_tostring(L, -1));
+	} else {
+		for (int i = top + 1; i <= lua_gettop(L); ++i) {
+			debugPrintf("%s\n", Script::describeValue(L, i).c_str());
+		}
+	}
+
+	lua_settop(L, top);
+	return true;
+}
+
 bool NancyConsole::Cmd_listRecords(int argc, const char **argv) {
 	if (argc > 3) {
 		debugPrintf("Lists the records of the scene scripts, in Nancy19 and later.\n");
