@@ -295,6 +295,21 @@ static void releaseButton(const Common::Array<Record *> &records, int button) {
 	Record *pressed = state.pressed[button];
 	if (pressed) {
 		state.pressed[button] = nullptr;
+
+		// The overrides in front of the pressed region got the press before
+		// it, so they get the release too. Nancy30's phone lists its contacts
+		// in an override that picks one when the button goes up, in front of a
+		// sink that takes the clicks the phone gets.
+		for (Record *record : records) {
+			if (record == pressed) {
+				break;
+			}
+
+			if (isOverride(record) && callInputFunction(record, button == 0 ? "OnLeftUp" : "OnRightUp")) {
+				break;
+			}
+		}
+
 		pressed->releaseRegion(button);
 		return;
 	}
