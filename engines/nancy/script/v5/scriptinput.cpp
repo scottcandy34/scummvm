@@ -164,12 +164,12 @@ static void updateHover(const Common::Array<Record *> &records) {
 
 	Record *hovered = nullptr;
 	Record *pressed = state.pressed[0] ? state.pressed[0] : state.pressed[1];
-	if (pressed) {
-		// A hotspot that is held down is the only one the mouse can be over
-		if (state.hasMouse && pressed->hitTest(state.mouse)) {
-			hovered = pressed;
-		}
+	if (pressed && state.hasMouse && pressed->hitTest(state.mouse)) {
+		// A hotspot that is held down keeps the mouse while it is over it
+		hovered = pressed;
 	} else if (state.hasMouse) {
+		// Off it, the mouse is over the region under it. Nancy30's scramble
+		// puzzles move the held letter to the one the mouse is dragged over.
 		for (Record *record : records) {
 			if (record->isMouseRegion() && record->hitTest(state.mouse)) {
 				hovered = record;
