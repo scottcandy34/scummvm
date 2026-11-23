@@ -41,6 +41,7 @@
 #include "engines/nancy/sound.h"
 #include "engines/nancy/resource/cif.h"
 #include "engines/nancy/resource/iff.h"
+#include "engines/nancy/resource/xsheetfile.h"
 #include "engines/nancy/input.h"
 #include "engines/nancy/graphics.h"
 
@@ -72,6 +73,7 @@ NancyConsole::NancyConsole() : GUI::Debugger() {
 	registerCmd("play_video", WRAP_METHOD(NancyConsole, Cmd_playVideo));
 	registerCmd("test_movies", WRAP_METHOD(NancyConsole, Cmd_testMovies));
 	registerCmd("test_sounds", WRAP_METHOD(NancyConsole, Cmd_testSounds));
+	registerCmd("test_resources", WRAP_METHOD(NancyConsole, Cmd_testResources));
 	registerCmd("play_sound", WRAP_METHOD(NancyConsole, Cmd_playSound));
 	registerCmd("load_scene", WRAP_METHOD(NancyConsole, Cmd_loadScene));
 	registerCmd("scene_id", WRAP_METHOD(NancyConsole, Cmd_sceneID));
@@ -514,6 +516,56 @@ bool NancyConsole::Cmd_testSounds(int argc, const char **argv) {
 	}
 
 	debugPrintf("Tested %u sounds, %u failed\n", numTested, numFailed);
+	return true;
+}
+
+bool NancyConsole::Cmd_testResources(int argc, const char **argv) {
+	if (argc > 2) {
+		debugPrintf("Loads every image and XSheet in the ciftrees, and reports the ones that fail.\n");
+		debugPrintf("Usage: %s [cal]\n", argv[0]);
+		return true;
+	}
+
+	const Common::String treeName = argc == 2 ? argv[1] : "";
+	uint numTested = 0, numFailed = 0;
+
+	Common::Array<Common::Path> images;
+	g_nancy->_resource->list(treeName, images, CifInfo::kResTypeImage);
+	for (const Common::Path &name : images) {
+		++numTested;
+		Graphics::ManagedSurface surf;
+		if (!g_nancy->_resource->loadImage(name, surf, treeName) || surf.w == 0 || surf.h == 0) {
+			debugPrintf("FAIL image %s\n", name.toString().c_str());
+			++numFailed;
+		}
+	}
+
+	debugPrintf("Tested %u images, %u failed\n", numTested, numFailed);
+
+	uint numSheets = 0, numSheetsFailed = 0;
+	Common::Array<Common::Path> sheets;
+	g_nancy->_resource->list(treeName, sheets, CifInfo::kResTypeXSheet);
+	for (const Common::Path &name : sheets) {
+		++numSheets;
+		XSheetFile sheet;
+		bool failed = !sheet.load(name.toString());
+		if (!failed) {
+			for (const Common::String &tree : sheet.treeNames) {
+				if (!tree.empty() && !SearchMan.hasFile(Common::Path(tree + ".bik")) && !SearchMan.hasFile(Common::Path(tree + ".bk2"))) {
+					debugPrintf("XSheet %s: no movie %s\n", name.toString().c_str(), tree.c_str());
+					failed = true;
+				}
+			}
+		}
+
+		if (failed) {
+			debugPrintf("FAIL xsheet %s\n", name.toString().c_str());
+			++numSheetsFailed;
+		}
+	}
+
+	debugPrintf("Tested %u XSheets, %u failed\n", numSheets, numSheetsFailed);
+
 	return true;
 }
 
