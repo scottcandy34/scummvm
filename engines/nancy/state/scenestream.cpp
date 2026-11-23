@@ -177,6 +177,12 @@ byte SceneStream::getEventFlag(int16 index) const {
 #ifdef ENABLE_NANCY_V4
 // Nancy19 scenes are Lua scripts, which make their own records
 bool SceneStream::loadScriptedScene() {
+	// The outgoing scene's records die before the next script runs, like the
+	// main stream's
+	if (_scriptScene && Scene::hasScript(_nextSceneName)) {
+		endScene();
+	}
+
 	Script::SceneContext *scriptScene = new Script::SceneContext(_name, _nextSceneName, _nextFrameID, _zOffset);
 	NancySceneState.getStreams().beginSceneLoad(scriptScene);
 	const bool isLoaded = scriptScene->load();

@@ -364,7 +364,14 @@ void SceneContext::registerGraphics() {
 	}
 }
 
+// A scene ends only once, which can be before the next one is loaded; see
+// Scene::loadScriptedScene
 void SceneContext::end() {
+	if (_hasEnded) {
+		return;
+	}
+
+	_hasEnded = true;
 	for (Record *record : _records) {
 		record->onDie();
 	}

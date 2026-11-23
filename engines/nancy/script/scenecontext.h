@@ -228,6 +228,7 @@ private:
 	bool _isStreamPausedByScript = false;
 	bool _isEnding = false;
 	bool _isLoading = false;
+	bool _hasEnded = false;
 	uint _frame;
 	int32 _zOffset;
 

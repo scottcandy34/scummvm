@@ -2358,6 +2358,13 @@ void Scene::loadScriptedScene(bool fromSaveFile) {
 	const Common::String sceneName = _nextScriptSceneName.empty() ?
 		Common::String::format("s%u", _sceneState.nextScene.sceneID) : _nextScriptSceneName;
 
+	// The records of the outgoing scene die before the next scene's script
+	// runs, as long as there is one. Nancy30's puzzle views store the pieces
+	// of a finished puzzle when they die, which its won scene then shows again.
+	if (!fromSaveFile && _scriptScene && hasScript(sceneName)) {
+		_scriptScene->end();
+	}
+
 	Script::SceneContext *scriptScene = new Script::SceneContext(SceneStreamManager::getMainStreamName(), sceneName, _sceneState.nextScene.frameID, 0);
 	_streams.beginSceneLoad(scriptScene);
 	const bool isLoaded = scriptScene->load();
@@ -2477,6 +2484,12 @@ void Scene::processMainStream() {
 // stream ends, and when the game is left, unless the stream is paused. It saves
 // the game of the profile, which is done at once, while the scene is still the
 // one the player was in.
+bool Scene::hasScript(const Common::String &name) {
+	Common::SeekableReadStream *stream = g_nancy->_resource->loadScript(Common::Path(name));
+	delete stream;
+	return stream != nullptr;
+}
+
 void Scene::runSceneEndScript() {
 	if (g_nancy->getGameType() != kGameTypeNancyDossier1 || !_ndui || !_scriptScene || _scriptScene->isPausedByScript()) {
 		return;

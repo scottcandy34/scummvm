@@ -155,6 +155,8 @@ public:
 	// Nancy17 streams: scenes that run next to the one the player walks around in,
 	// which is the main stream
 	SceneStreamManager &getStreams() { return _streams; }
+	// Whether there is a script by the name, which a scene can be loaded from
+	static bool hasScript(const Common::String &name);
 
 	// Whether the main stream or another one is about to go to another scene
 	bool isSceneChangePending() const { return _state == kLoad || _streams.hasSceneChange(); }
