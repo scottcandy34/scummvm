@@ -119,6 +119,12 @@ SceneContext::~SceneContext() {
 }
 
 const RefImage *SceneContext::loadRef(const Common::String &name) {
+	// An empty name is no ref, so the whole rect of a hotspot can be hit.
+	// Nancy30's UI pools reset every hotspot they hand out with ref = "".
+	if (name.empty()) {
+		return nullptr;
+	}
+
 	RefImage *ref = _refs.getValOrDefault(name, nullptr);
 	if (!ref) {
 		ref = new RefImage();
