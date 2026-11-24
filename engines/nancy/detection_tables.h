@@ -967,7 +967,7 @@ static const ADGameDescription gameDescriptions[] = {
 		AD_ENTRY1s("ciftree.dat", "3bb107b4d494bcee2ec61066632757af", 198488111),
 		Common::EN_ANY,
 		Common::kPlatformWindows,
-		ADGF_UNSTABLE | ADGF_DROPPLATFORM,
+		ADGF_DROPPLATFORM,
 		NANCY_GUIOPTIONS
 	},
 	{ // MD5 by bluegr
